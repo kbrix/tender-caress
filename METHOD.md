@@ -31,10 +31,12 @@ This file is tool-agnostic. It speaks in **roles**, not tools. `claude/CLAUDE.md
 | **Verifier** | Re-checks one task group independently and re-runs its assertions. | Trusts the implementer's report. |
 | **Reviewer** | Reviews a whole branch with fresh context (no prior conversation). | Edits code. |
 | **Adversarial reviewer** | Hunts for defects through one **lens** (code correctness, spec truth, completeness, safety…). | Reports style preferences as defects. |
+| **Breaker** | Uses the product the way a hostile or confused user would (odd inputs, wrong order, empty or huge data, the regime where the change matters) and reports each break as a reproducible command with its wrong output. | Starts from the implementation instead of the specs and docs. |
+| **Mutant** | Breaks the changed code on purpose (flipped conditions, deleted calls, off-by-one boundaries, swapped constants), runs the tests, and reports every mutant that survives. | Mutates tests, or works in a shared working tree. |
 | **Refuter** | Tries to prove one finding wrong or immaterial before anyone acts on it. | Confirms without checking the evidence. |
 | **Fixer** | Applies confirmed findings and records each one's disposition. | Fixes unconfirmed findings silently. |
 
-One agent can hold several roles over time, but never both sides of a check (implementer and verifier, or author and refuter).
+One agent can hold several roles over time, but never both sides of a check (implementer and verifier, implementer and mutant, or author and refuter).
 
 ---
 
@@ -46,7 +48,7 @@ The lead proposes a tier for every piece of work; the operator can overrule it.
 |---|---|---|
 | **Trivial** | Typos, comments, docs that change no promise | A branch, the change, one look by a reviewer (or the operator). |
 | **Standard** | A small behavior change in one area, no data or live-system risk | A spec delta + tasks, test first, one fresh reviewer, the fix diff re-checked. |
-| **Full** | Architecture, data migrations, money, live external systems, anything hard to reverse | The whole lifecycle below. |
+| **Full** | Architecture, data migrations, money, live external systems, anything hard to reverse | The whole lifecycle below, including the probe (breaker and mutant). |
 
 When unsure, pick the higher tier.
 
@@ -79,7 +81,10 @@ When unsure, pick the higher tier.
 
 ### 4.4 Review the branch
 
-10. **Two reviews in parallel:** a fresh reviewer over the whole branch (build, full suite, spec adherence), and an adversarial review with lenses and refuters. Tell the second about the first's findings so it hunts for what was missed.
+10. **Review and probe in parallel:**
+    - a fresh reviewer over the whole branch (build, full suite, spec adherence);
+    - an adversarial review with lenses and refuters (tell it about the fresh reviewer's findings, so it hunts for what was missed);
+    - a **probe**: a breaker exercises the built product against its specs, and a mutant mutates the changed code in an isolated copy. Each surviving mutant is a missing test or code that nothing needs. Their findings go to refuters too.
 11. **Fix** in one pass from a fix brief that lists every finding id. Record a disposition per id: fixed (commit), declined (reason) or owned by the lead. Then review the **fix diff** adversarially, apply a second pass if needed, and **re-verify**: the full suite, the side-effect checks and the smoke run again.
 
 ### 4.5 Prove it live (when a live system is involved)
@@ -103,6 +108,7 @@ When unsure, pick the higher tier.
 - **Positive controls.** Every absence check ("no longer mentions X", "0 rows", "no requests sent") is paired with the same command against something that must match: the old revision, or a kept sibling term. Otherwise a broken grep passes silently.
 - **Measured values.** Write the actual value into the task notes, with the date. Memory and summaries drift.
 - **Red first, then mutate.** A new test must fail before the change, pass after, and fail again when the change is reverted or broken on purpose. A test that never failed proves nothing.
+- **Independent mutation.** The implementer's own mutation check shows that a test can fail; it does not show that the tests are enough, because the implementer picks a mutation the test catches. On the Full tier a separate mutant mutates the changed code without looking at the tests first.
 - **Side-effect accounting.** After test runs, check what changed outside the code: database rows, vendor quota usage, files written, sockets opened. A test suite that quietly writes to a real database or spends paid API credits is a defect.
 - **Hermetic by default.** Tests isolate themselves from the developer's environment (environment variables, config files, live endpoints) unless a test is explicitly marked live.
 - **Check the shape of the check.** Wrapped lines counted twice, filters that match unrelated names, a multi-file `sed` that reads one file, a stale build: a wrong-shaped assertion is as bad as no assertion. When one is found, fix it and say so.
@@ -161,7 +167,7 @@ Every new fact goes to exactly one place:
 
 - Marking a task done because the command ran.
 - An absence check without a positive control.
-- The implementer verifying its own work.
+- The implementer verifying its own work, or choosing the only mutation its tests are judged by.
 - Applying review findings without reviewing the fix.
 - A live check run only in the regime where the change cannot matter.
 - Re-asking a decided question, or deciding an open one silently.

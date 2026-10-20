@@ -8,7 +8,7 @@ A working method for building software with AI agents: every behavior change is 
 |---|---|
 | [`METHOD.md`](METHOD.md) | The method itself. Tool-agnostic: principles, roles, process tiers, the lifecycle, verification and spec discipline, safety rails, the autonomy contract. |
 | [`claude/CLAUDE.md`](claude/CLAUDE.md) | How the method runs in Claude Code: subagents, workflows, Ultracode, memory. |
-| [`claude/workflows/`](claude/workflows) | Four Workflow-tool scripts: `propose-review`, `apply-groups`, `adversarial-review`, `fix-and-review`. |
+| [`claude/workflows/`](claude/workflows) | Five Workflow-tool scripts: `propose-review`, `apply-groups`, `adversarial-review`, `probe` (breaker + mutant), `fix-and-review`. |
 | [`claude/agents/branch-reviewer.md`](claude/agents/branch-reviewer.md) | A fresh-context branch reviewer that writes `REVIEW_NOTES.md`. |
 | [`templates/`](templates) | `AGENTS.local.md` (a repository's local specifics), `BRIEF.md`, `FIX-BRIEF.md`, `KICKOFF.md`. |
 
