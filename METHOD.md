@@ -2,7 +2,7 @@
 
 A way of building software with AI agents where every behavior change is written down as a spec first, and every claim about the work is checked by someone other than the one who made it, with a command whose output proves it.
 
-This file is tool-agnostic. It speaks in **roles**, not tools. `claude/CLAUDE.md` maps the roles onto Claude Code. A repository adds its own specifics (commands, live systems, safety rails) in its `AGENTS.md`; where that file and this one disagree, the repository's file wins.
+This file is tool-agnostic. It speaks in **roles**, not tools. `claude/CLAUDE.md` and `copilot/COPILOT.md` map the roles onto Claude Code and GitHub Copilot CLI. A repository adds its own specifics (commands, live systems, safety rails) in its `AGENTS.md`; where that file and this one disagree, the repository's file wins.
 
 ---
 
@@ -11,7 +11,7 @@ This file is tool-agnostic. It speaks in **roles**, not tools. `claude/CLAUDE.md
 1. **The spec is the contract.** Specs describe what the system SHALL do today. A behavior change is a spec change first. When code and spec disagree, that is a bug in one of them, never "expected behavior".
 2. **Prove it literally.** A task is done when a command shows the promised outcome: `<run the thing> | <extract the promised value> | <assert it>`. Exit codes, log lines and "tests pass" are symptoms, not proof.
 3. **Nobody grades their own work.** The one who implements is never the one who verifies. Reviews come from fresh context, and every review finding is challenged before anyone acts on it.
-4. **Fixes are riskier than drafts.** Applying review findings introduces new defects more often than first drafts do, so every fix diff is reviewed again.
+4. **Fixes are riskier than drafts.** Applying review findings — or editing a shared helper to fix one caller cluster — introduces new defects more often than first drafts do, so every fix diff is reviewed again and every shared-helper edit is checked across all caller regimes.
 5. **Small, ordered changes.** Split work into changes that each have one clear purpose. Each requirement is edited by exactly one change.
 6. **The operator decides product; the agent decides engineering.** Ask only questions whose answer changes what gets built. Consequences of a decided direction are design decisions, not questions.
 7. **Quality over speed.** The ceremony is the product. Cut scope, never verification. Give honest time estimates instead of skipping steps.
@@ -59,6 +59,7 @@ When unsure, pick the higher tier.
 ### 4.1 Explore and decide
 
 1. **Baseline first.** Before changing anything, capture the current state: the full test suite, a CLI/API smoke run, and the live checks, saved for later comparison.
+   - **Bisect and provenance first (for regressions and multi-failure triage).** When investigating failing tests or regressions across runs or branches, bisect the commit range (`<last-green>..<first-red>`) and compare adjacent branches (for example, a release spine vs `main`) **before** launching per-area explorers. Pass the candidate culprit commits into every explorer's brief so five symptom clusters with one shared root cause collapse immediately instead of being diagnosed five times in isolation.
 2. **Explore** with several explorers in parallel, one per area. Then a **critic** consolidates the reports into numbered open questions, each with a recommendation.
 3. **The operator decides.** Record each answer verbatim, with the date, next to its question. "Accept all recommendations" is a valid answer.
 4. **Split** the work into ordered changes. Name what each change owns, so that two changes never edit the same requirement. A change that leaves something for a later one writes a **hand-off list** with exact anchors (`file:line`, requirement headers).
@@ -66,6 +67,7 @@ When unsure, pick the higher tier.
 ### 4.2 Draft and review the change
 
 5. **Write a brief** for the drafter: scope (decided items quoted), what not to touch, inputs to read, the literal verification the tasks must encode, and the process constraints.
+   - **Caller regime matrix (for shared helpers and infrastructure).** Whenever a change modifies a shared helper, base class or message router to fix one cluster of callers, enumerate every distinct caller regime (null/optional arguments, legacy entry points, migrated or untriggered states, ordering assumptions) in the brief before implementation.
 6. **Draft** the change: proposal (why, what changes), design (decisions D1, D2… with alternatives), spec deltas, tasks (grouped, each with a literal assertion and a positive control).
 7. **Review the draft adversarially** through at least three lenses:
    - **spec truth**: headers and quoted text verbatim, every factual claim true against the code;
@@ -77,6 +79,9 @@ When unsure, pick the higher tier.
 ### 4.3 Implement
 
 8. **Apply in groups**, one after another. For each group: an implementer works test first (red, then green, then a mutation check), records measured values in the task notes, and commits. Then an independent verifier re-runs the group's assertions and fixes or reports defects.
+   - **Single-tree build serialization (`Build mutex`).** When parallel agents work in a single checkout (where git worktrees are impractical, such as large codegen monorepos), file-disjoint edits and read-only exploration or reviews run in parallel, but build and test commands (`./gradlew`, `cargo`, etc.) must be serialized so concurrent daemons do not corrupt shared build state or contend on locks.
+   - **Shared-helper blast-radius sweep.** When a group modifies a shared helper, base class or message router, run a dedicated multi-lens adversarial review and a representative caller verification sweep across every regime in the caller regime matrix before running full CI suites.
+   - **Provenance-linked atomic commits.** When fixing regressions or backporting across branches, commit one logical fix per commit, recording in the commit body: (a) the culprit commit URL/SHA that introduced or exposed the failure, and (b) for backports, the original fix PR and commit URL/SHA.
 9. A failed assertion is a stop, not a rounding error. Either the code is wrong or the assertion is wrong-shaped. Fix the smaller thing and say so in the notes.
 
 ### 4.4 Review the branch
@@ -85,7 +90,7 @@ When unsure, pick the higher tier.
     - a fresh reviewer over the whole branch (build, full suite, spec adherence);
     - an adversarial review with lenses and refuters (tell it about the fresh reviewer's findings, so it hunts for what was missed);
     - a **probe**: a breaker exercises the built product against its specs, and a mutant mutates the changed code in an isolated copy. Each surviving mutant is a missing test or code that nothing needs. Their findings go to refuters too.
-11. **Fix** in one pass from a fix brief that lists every finding id. Record a disposition per id: fixed (commit), declined (reason) or owned by the lead. Then review the **fix diff** adversarially, apply a second pass if needed, and **re-verify**: the full suite, the side-effect checks and the smoke run again.
+11. **Fix** in one pass from a fix brief that lists every finding id. Record a disposition per id: fixed (commit), declined (reason) or owned by the lead. Commit one logical fix per commit with full provenance (culprit commit URL/SHA, and original PR/commit URL/SHA for backports). When a fix touches a shared helper, re-check its caller regime matrix. Then review the **fix diff** adversarially, apply a second pass if needed, and **re-verify**: the full suite, the side-effect checks and the smoke run again.
 
 ### 4.5 Prove it live (when a live system is involved)
 
@@ -172,6 +177,9 @@ Every new fact goes to exactly one place:
 - A live check run only in the regime where the change cannot matter.
 - Re-asking a decided question, or deciding an open one silently.
 - Rationalizing a surprise ("it's probably expected") instead of reading the spec.
+- Launching per-failure explorers on a regression run before bisecting `<last-green>..<first-red>` and checking adjacent branches.
+- Editing a shared helper for one failing caller without sweeping its other caller regimes (null arguments, legacy entry points, migrated states).
+- Running concurrent builds or test suites in the same working tree without a build mutex.
 - Slimming the review to save time on a Full-tier change.
 
 ---
@@ -180,4 +188,4 @@ Every new fact goes to exactly one place:
 
 1. Add this repository as a submodule (see `README.md`).
 2. In the repository's `AGENTS.md`, state that it follows `method/METHOD.md`, then fill in the local specifics from `templates/AGENTS.local.md`: build and test commands, test categories, side-effect checks, live systems, safety rails, anchor incidents.
-3. Wire in the tool-specific part (for Claude Code: `claude/CLAUDE.md`).
+3. Wire in the tool-specific part (for Claude Code: `claude/CLAUDE.md`; for GitHub Copilot CLI: `copilot/COPILOT.md`).

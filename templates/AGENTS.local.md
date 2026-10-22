@@ -14,6 +14,12 @@ This repository follows the method in `method/METHOD.md` (Verified Spec-Driven D
 - Non-live tests: `<command>` (must be hermetic: no real databases, endpoints or secrets)
 - Live tests: `<command>` (need: <running services>)
 - Spec validation: `openspec validate --all --strict`
+- Concurrency / build mutex: `<whether parallel subagents may build concurrently in one checkout, must serialize build/test commands in a single tree, or must use separate git worktrees>`
+
+## Git and release spine
+
+- Default branch / release spine: `<e.g. oldest active release -> newer releases -> main; where shared vs customer fixes land>`
+- Commit provenance: `<e.g. one logical fix per commit; include culprit commit SHA/URL and, for backports, original fix PR/commit URL>`
 
 ## Test categories
 

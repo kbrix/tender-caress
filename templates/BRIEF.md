@@ -17,8 +17,8 @@ Branch `<change-name>` (off `<base-sha>`). Write the OpenSpec change at `openspe
 
 ## Inputs (read all)
 
-- <exploration reports, hand-off lists, archived changes for house style>
-- `.claude/skills/openspec-propose/SKILL.md` (its format rules win), if present.
+- <exploration reports, culprit commits from bisection, hand-off lists, archived changes for house style>
+- `.claude/skills/openspec-propose/SKILL.md` or `.agents/skills/openspec-propose/SKILL.md` (its format rules win), if present.
 
 ## Delta rules
 
